@@ -1,2 +1,4 @@
 .idea
 .venv
+./starter/phase_1/.env
+./starter/phase_2/.env
