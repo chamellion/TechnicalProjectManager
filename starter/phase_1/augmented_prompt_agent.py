@@ -24,6 +24,6 @@ print(augmented_agent_response)
 
 # TODO: 4 - Add a comment explaining:
 # - What knowledge the agent likely used to answer the prompt.
-    # The agent will likely have used it trained model to answer the prompt as no external knowledge was provided to model.
+print("The agent will likely have used it trained model to answer the prompt as no external knowledge was provided to model.")
 # - How the system prompt specifying the persona affected the agent's response.
-    # The agent clearly assumed the persona by starting the response with the persona string "Dear students,"".
+print("The agent clearly assumed the persona by starting the response with the persona string \"Dear students,\"")

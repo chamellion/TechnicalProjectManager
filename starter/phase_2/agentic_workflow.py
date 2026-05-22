@@ -14,8 +14,15 @@ openai_api_key = os.getenv("OPENAI_API_KEY")
 
 # load the product spec
 # TODO: 3 - Load the product spec document Product-Spec-Email-Router.txt into a variable called product_spec
-with open("Product-Spec-Email-Router.txt", "r") as f:
-    product_spec = f.read()
+try:
+    with open("Product-Spec-Email-Router.txt", "r", encoding="utf-8") as f:
+        product_spec = f.read()
+
+    if not product_spec.strip():
+        raise ValueError("Product spec document is empty.")
+
+except FileNotFoundError:
+    raise FileNotFoundError("Product spec document not found. Please check the file path.")
 
 # Instantiate all the agents
 
@@ -54,7 +61,15 @@ product_manager_evaluation_agent = EvaluationAgent(openai_api_key=openai_api_key
 
 # Program Manager - Knowledge Augmented Prompt Agent
 persona_program_manager = "You are a Program Manager, you are responsible for defining the features for a product."
-knowledge_program_manager = "Features of a product are defined by organizing similar user stories into cohesive groups."
+knowledge_program_manager = (
+    "Product features are defined by grouping related user stories. "
+    "Each feature must be described using this exact structure:\n"
+    "Feature Name: A clear, concise title that identifies the capability\n"
+    "Description: A brief explanation of what the feature does and its purpose\n"
+    "Key Functionality: The specific capabilities or actions the feature provides\n"
+    "User Benefit: How this feature creates value for the user\n"
+    f"Product spec: {product_spec}"
+)
 # Instantiate a program_manager_knowledge_agent using 'persona_program_manager' and 'knowledge_program_manager'
 # (This is a necessary step before TODO 8. Students should add the instantiation code here.)
 program_manager_knowledge_agent = KnowledgeAugmentedPromptAgent(openai_api_key=openai_api_key,persona=persona_program_manager,knowledge=knowledge_program_manager)
@@ -78,7 +93,19 @@ program_manager_evaluation_agent = EvaluationAgent(openai_api_key=openai_api_key
 
 # Development Engineer - Knowledge Augmented Prompt Agent
 persona_dev_engineer = "You are a Development Engineer, you are responsible for defining the development tasks for a product."
-knowledge_dev_engineer = "Development tasks are defined by identifying what needs to be built to implement each user story."
+knowledge_dev_engineer = (
+    "Development tasks are defined by identifying what needs to be built to implement each user story. "
+    "Each task must follow this exact structure:\n"
+    "Task ID: A unique identifier for tracking purposes\n"
+    "Task Title: Brief description of the specific development work\n"
+    "Related User Story: Reference to the parent user story (must use personas from the product spec "
+    "such as Customer Support Representative, Subject Matter Expert, or IT Administrator)\n"
+    "Description: Detailed explanation of the technical work required\n"
+    "Acceptance Criteria: Specific requirements that must be met for completion\n"
+    "Estimated Effort: Time or complexity estimation\n"
+    "Dependencies: Any tasks that must be completed first\n"
+    f"Product spec: {product_spec}"
+)
 # Instantiate a development_engineer_knowledge_agent using 'persona_dev_engineer' and 'knowledge_dev_engineer'
 # (This is a necessary step before TODO 9. Students should add the instantiation code here.)
 development_engineer_knowledge_agent = KnowledgeAugmentedPromptAgent(openai_api_key=openai_api_key,persona=persona_dev_engineer,knowledge=knowledge_dev_engineer)
@@ -134,12 +161,12 @@ def development_engineer_support_function(query):
 agents = [
     {
         "name": "product manager",
-        "description": "Product Manager that's responsible for defining the user stories for a product only, Does not define the features or tasks for a product.",
+        "description": "Product Manager responsible for writing user stories only, in the format 'As a [user], I want [action] so that [benefit]'. Does not define product features or engineering tasks.",
         "func": product_manager_support_function
     },
     {
         "name": "program manager",
-        "description": "Program Manager responsible for defining the features for a product only, Does not define the user stories or tasks for a product.",
+        "description": "Program Manager responsible for defining and organizing product capabilities into features with Feature Name, Description, Key Functionality, and User Benefit. Does not write user stories or engineering tasks.",
         "func": program_manager_support_function
     },
     {
@@ -155,7 +182,11 @@ routing_agent = RoutingAgent(openai_api_key, agents)
 print("\n*** Workflow execution started ***\n")
 # Workflow Prompt
 # ****
-workflow_prompt = "What would the development tasks for this product be?"
+workflow_prompt = ("Create a complete project plan for the Email Router product. "
+                   "The plan must include: "
+                   "1. User stories for all user personas in the product spec, "
+                   "2. Product features defined by grouping those user stories, "
+                   "3. Engineering development tasks for implementing each user story.")
 # ****
 print(f"Task to complete in this workflow, workflow prompt = {workflow_prompt}")
 
@@ -169,10 +200,32 @@ completed_steps = []
 #      a. For each step, use the 'routing_agent' to route the step to the appropriate support function.
 #      b. Append the result to 'completed_steps'.
 #      c. Print information about the step being executed and its result.
+user_stories_output = ""
+features_output = ""
+tasks_output = []
 for step in action_plan:
     print(f"Executing step: {step}")
     route_result = routing_agent.route_prompt_to_agent(step)
     completed_steps.append(route_result)
     print(f"Step: {step}, Route Result: {route_result}")
-#   4. After the loop, print the final output of the workflow (the last completed step).
-print(f"Final workflow output: {completed_steps[-1]}")
+    #   4. After the loop, print the final output of the workflow (the last completed step).
+
+    stripped = step.strip()
+    if stripped.startswith("1."):
+        user_stories_output = route_result
+    elif stripped.startswith("2."):
+        features_output = route_result
+    elif stripped.startswith("3."):
+        tasks_output.append(route_result)
+
+final_output = (
+    "Completed Plan \n\n"
+    "--- USER STORIES ---\n"
+    f"{user_stories_output}\n\n"
+    "--- PRODUCT FEATURES ---\n"
+    f"{features_output}\n\n"
+    "--- ENGINEERING TASKS ---\n"
+    f"{chr(10).join(tasks_output)}\n"
+)
+
+print(f"Final workflow output:\n{final_output}")
